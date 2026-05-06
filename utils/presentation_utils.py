@@ -7,6 +7,26 @@ from typing import Dict, List, Optional
 import os
 
 
+def _get_workspace_dir() -> str:
+    """
+    Return the container workspace directory used for read/write files.
+
+    The docker-compose mounts the host folder as a volume (typically at `/workspace`).
+    Callers often pass relative paths (e.g. `my.pptx`); without this, files would be
+    saved under the process CWD (e.g. `/app`) and would not persist.
+    """
+    return os.environ.get("MCP_POWERPOINT_WORKSPACE_DIR") or os.environ.get("PPT_WORKSPACE_DIR") or "/workspace"
+
+
+def _resolve_in_workspace(file_path: str) -> str:
+    """Resolve relative paths into the workspace directory."""
+    if not file_path:
+        return file_path
+    if os.path.isabs(file_path):
+        return file_path
+    return os.path.join(_get_workspace_dir(), file_path)
+
+
 def create_presentation() -> Presentation:
     """
     Create a new PowerPoint presentation.
@@ -27,7 +47,10 @@ def open_presentation(file_path: str) -> Presentation:
     Returns:
         A Presentation object
     """
-    return Presentation(file_path)
+    resolved_path = file_path
+    if not os.path.exists(resolved_path):
+        resolved_path = _resolve_in_workspace(file_path)
+    return Presentation(resolved_path)
 
 
 def create_presentation_from_template(template_path: str) -> Presentation:
@@ -44,18 +67,21 @@ def create_presentation_from_template(template_path: str) -> Presentation:
         FileNotFoundError: If the template file doesn't exist
         Exception: If the template file is corrupted or invalid
     """
-    if not os.path.exists(template_path):
+    resolved_path = template_path
+    if not os.path.exists(resolved_path):
+        resolved_path = _resolve_in_workspace(template_path)
+    if not os.path.exists(resolved_path):
         raise FileNotFoundError(f"Template file not found: {template_path}")
     
-    if not template_path.lower().endswith(('.pptx', '.potx')):
-        raise ValueError("Template file must be a .pptx or .potx file")
+    if not resolved_path.lower().endswith(".pptx"):
+        raise ValueError("Template file must be a .pptx file (.potx is not supported)")
     
     try:
         # Load the template file as a presentation
-        presentation = Presentation(template_path)
+        presentation = Presentation(resolved_path)
         return presentation
     except Exception as e:
-        raise Exception(f"Failed to load template file '{template_path}': {str(e)}")
+        raise Exception(f"Failed to load template file '{resolved_path}': {str(e)}")
 
 
 def save_presentation(presentation: Presentation, file_path: str) -> str:
@@ -69,8 +95,12 @@ def save_presentation(presentation: Presentation, file_path: str) -> str:
     Returns:
         The file path where the presentation was saved
     """
-    presentation.save(file_path)
-    return file_path
+    resolved_path = _resolve_in_workspace(file_path)
+    workspace_dir = os.path.dirname(resolved_path) if os.path.isabs(resolved_path) else _get_workspace_dir()
+    if workspace_dir:
+        os.makedirs(workspace_dir, exist_ok=True)
+    presentation.save(resolved_path)
+    return resolved_path
 
 
 def get_template_info(template_path: str) -> Dict:

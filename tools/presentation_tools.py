@@ -38,11 +38,15 @@ def register_presentation_tools(app: FastMCP, presentations: Dict, get_current_p
 
     @app.tool(
         annotations=ToolAnnotations(
-            title="Create Presentation from Template",
+            title="Create Presentation from Model",
         ),
     )
-    def create_presentation_from_template(template_path: str, id: Optional[str] = None) -> Dict:
-        """Create a new PowerPoint presentation from a template file."""
+    def create_presentation_from_model(template_path: str, id: Optional[str] = None) -> Dict:
+        """Create a new PowerPoint presentation from a model file."""
+        if template_path.lower().endswith(".potx"):
+            return {
+                "error": "Model file must be a .pptx file (.potx is not supported)"
+            }
         # Check if template file exists
         if not os.path.exists(template_path):
             # Try to find the template by searching in configured directories
@@ -57,7 +61,7 @@ def register_presentation_tools(app: FastMCP, presentations: Dict, get_current_p
             else:
                 env_path_info = f" (PPT_TEMPLATE_PATH: {os.environ.get('PPT_TEMPLATE_PATH', 'not set')})" if os.environ.get('PPT_TEMPLATE_PATH') else ""
                 return {
-                    "error": f"Template file not found: {template_path}. Searched in {', '.join(search_dirs)}{env_path_info}"
+                    "error": f"Model file not found: {template_path}. Searched in {', '.join(search_dirs)}{env_path_info}"
                 }
         
         # Create presentation from template
@@ -65,7 +69,7 @@ def register_presentation_tools(app: FastMCP, presentations: Dict, get_current_p
             pres = ppt_utils.create_presentation_from_template(template_path)
         except Exception as e:
             return {
-                "error": f"Failed to create presentation from template: {str(e)}"
+                "error": f"Failed to create presentation from model: {str(e)}"
             }
         
         # Generate an ID if not provided
@@ -77,8 +81,8 @@ def register_presentation_tools(app: FastMCP, presentations: Dict, get_current_p
         
         return {
             "presentation_id": id,
-            "message": f"Created new presentation from template '{template_path}' with ID: {id}",
-            "template_path": template_path,
+            "message": f"Created new presentation from model '{template_path}' with ID: {id}",
+            "model_path": template_path,
             "slide_count": len(pres.slides),
             "layout_count": len(pres.slide_layouts)
         }
@@ -174,12 +178,12 @@ def register_presentation_tools(app: FastMCP, presentations: Dict, get_current_p
 
     @app.tool(
         annotations=ToolAnnotations(
-            title="Get Template File Info",
+            title="Get Model File Info",
             readOnlyHint=True,
         ),
     )
-    def get_template_file_info(template_path: str) -> Dict:
-        """Get information about a template file including layouts and properties."""
+    def get_model_file_info(template_path: str) -> Dict:
+        """Get information about a model file including layouts and properties."""
         # Check if template file exists
         if not os.path.exists(template_path):
             # Try to find the template by searching in configured directories
@@ -193,14 +197,14 @@ def register_presentation_tools(app: FastMCP, presentations: Dict, get_current_p
                     break
             else:
                 return {
-                    "error": f"Template file not found: {template_path}. Searched in {', '.join(search_dirs)}"
+                    "error": f"Model file not found: {template_path}. Searched in {', '.join(search_dirs)}"
                 }
         
         try:
             return ppt_utils.get_template_info(template_path)
         except Exception as e:
             return {
-                "error": f"Failed to get template info: {str(e)}"
+                "error": f"Failed to get model info: {str(e)}"
             }
 
     @app.tool(

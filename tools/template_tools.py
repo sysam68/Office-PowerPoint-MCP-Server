@@ -7,10 +7,82 @@ from typing import Dict, List, Optional, Any
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 import utils.template_utils as template_utils
+import os
+from pathlib import Path
 
 
 def register_template_tools(app: FastMCP, presentations: Dict, get_current_presentation_id):
     """Register template-based tools with the FastMCP app"""
+
+    def _get_template_dir() -> Path:
+        value = os.environ.get("MCP_POWERPOINT_TEMPLATE_DIR") or os.environ.get("PPT_TEMPLATE_PATH") or "/app/templates"
+        # If PPT_TEMPLATE_PATH contains multiple entries, take the first one.
+        if "PPT_TEMPLATE_PATH" in os.environ and value and (":" in value or ";" in value):
+            separator = ";" if os.name == "nt" else ":"
+            value = next((p.strip() for p in value.split(separator) if p.strip()), value)
+        return Path(os.path.expanduser(value)).resolve()
+
+    @app.tool(
+        annotations=ToolAnnotations(
+            title="List Model Files",
+            readOnlyHint=True,
+        ),
+    )
+    def list_file_models(
+        recursive: bool = False,
+        extensions: Optional[List[str]] = None,
+    ) -> Dict:
+        """
+        List files present in the PowerPoint model directory.
+
+        The directory is taken from env `MCP_POWERPOINT_TEMPLATE_DIR` (preferred),
+        otherwise falls back to `PPT_TEMPLATE_PATH` (first entry) then `/app/templates`.
+
+        Args:
+            recursive: If true, list files in all subfolders.
+            extensions: Optional list of extensions to include (e.g. ['.pptx']).
+                        Comparison is case-insensitive.
+        """
+        try:
+            template_dir = _get_template_dir()
+            if not template_dir.exists() or not template_dir.is_dir():
+                return {
+                    "error": f"Template directory not found or not a directory: {str(template_dir)}",
+                    "template_dir": str(template_dir),
+                }
+
+            normalized_exts = None
+            if extensions:
+                normalized_exts = {("." + e.lower().lstrip(".")) for e in extensions if str(e).strip()}
+
+            iterator = template_dir.rglob("*") if recursive else template_dir.glob("*")
+            files: List[Dict[str, Any]] = []
+            for path in sorted((p for p in iterator if p.is_file()), key=lambda p: str(p).lower()):
+                # POTX templates are not supported by python-pptx in this server.
+                if path.suffix.lower() == ".potx":
+                    continue
+                if normalized_exts and path.suffix.lower() not in normalized_exts:
+                    continue
+                stat = path.stat()
+                files.append(
+                    {
+                        "name": path.name,
+                        "relative_path": str(path.relative_to(template_dir)),
+                        "absolute_path": str(path),
+                        "size_bytes": int(stat.st_size),
+                        "updated_at": int(stat.st_mtime),
+                    }
+                )
+
+            return {
+                "template_dir": str(template_dir),
+                "recursive": recursive,
+                "extensions": sorted(normalized_exts) if normalized_exts else None,
+                "count": len(files),
+                "files": files,
+            }
+        except Exception as e:
+            return {"error": f"Failed to list model files: {str(e)}"}
     
     @app.tool(
         annotations=ToolAnnotations(
@@ -28,7 +100,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
                 "available_templates": available_templates,
                 "total_templates": len(available_templates),
                 "usage_examples": usage_examples,
-                "message": "Use apply_slide_template to apply templates to slides"
+                "message": "Use apply_slide_layout_template to apply layout templates to slides"
             }
         except Exception as e:
             return {
@@ -37,10 +109,10 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
     
     @app.tool(
         annotations=ToolAnnotations(
-            title="Apply Slide Template",
+            title="Apply Slide Layout Template",
         ),
     )
-    def apply_slide_template(
+    def apply_slide_layout_template(
         slide_index: int,
         template_id: str,
         color_scheme: str = "modern_blue",
@@ -84,7 +156,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
             
             if result['success']:
                 return {
-                    "message": f"Applied template '{template_id}' to slide {slide_index}",
+                    "message": f"Applied layout template '{template_id}' to slide {slide_index}",
                     "slide_index": slide_index,
                     "template_applied": result
                 }
@@ -100,10 +172,10 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
     
     @app.tool(
         annotations=ToolAnnotations(
-            title="Create Slide from Template",
+            title="Create Slide from Layout Template",
         ),
     )
-    def create_slide_from_template(
+    def create_slide_from_layout_template(
         template_id: str,
         color_scheme: str = "modern_blue",
         content_mapping: Optional[Dict[str, str]] = None,
@@ -151,7 +223,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
             
             if result['success']:
                 return {
-                    "message": f"Created slide {slide_index} using template '{template_id}'",
+                    "message": f"Created slide {slide_index} using layout template '{template_id}'",
                     "slide_index": slide_index,
                     "template_applied": result
                 }
@@ -167,10 +239,10 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
     
     @app.tool(
         annotations=ToolAnnotations(
-            title="Create Presentation from Templates",
+            title="Create Presentation from Layout Sequence",
         ),
     )
-    def create_presentation_from_templates(
+    def create_presentation_from_layout_sequence(
         template_sequence: List[Dict[str, Any]],
         color_scheme: str = "modern_blue",
         presentation_title: Optional[str] = None,
@@ -256,11 +328,11 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
     
     @app.tool(
         annotations=ToolAnnotations(
-            title="Get Template Info",
+            title="Get Layout Template Info",
             readOnlyHint=True,
         ),
     )
-    def get_template_info(template_id: str) -> Dict:
+    def get_layout_template_info(template_id: str) -> Dict:
         """
         Get detailed information about a specific template.
         
@@ -301,7 +373,7 @@ def register_template_tools(app: FastMCP, presentations: Dict, get_current_prese
                 "has_background": 'background' in template,
                 "background_type": template.get('background', {}).get('type'),
                 "color_schemes": list(templates_data.get('color_schemes', {}).keys()),
-                "usage_tip": f"Use create_slide_from_template with template_id='{template_id}' to create a slide with this layout"
+                "usage_tip": f"Use create_slide_from_layout_template with template_id='{template_id}' to create a slide with this layout"
             }
             
         except Exception as e:
