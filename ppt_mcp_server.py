@@ -6,7 +6,7 @@ Consolidated version with 20 tools organized into multiple modules.
 import os
 import argparse
 from typing import Dict, Any
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 # import utils  # Currently unused
 from tools import (
@@ -22,8 +22,8 @@ from tools import (
     register_transition_tools
 )
 
-# Initialize the FastMCP server
-app = FastMCP(
+# Initialize the MCP server
+app = MCPServer(
     name="ppt-mcp-server"
 )
 
@@ -367,19 +367,19 @@ def get_server_info() -> Dict:
     return {
         "name": "PowerPoint MCP Server - Enhanced Edition",
         "version": "2.1.0",
-        "total_tools": 32,  # Organized into 11 specialized modules
+        "total_tools": 38,
         "loaded_presentations": len(presentations),
         "current_presentation": current_presentation_id,
         "features": [
             "Presentation Management (7 tools)",
-            "Content Management (6 tools)", 
-            "Template Operations (7 tools)",
+            "Content Management (8 tools)",
+            "Template Operations (8 tools)",
             "Structural Elements (4 tools)",
             "Professional Design (3 tools)",
-            "Specialized Features (5 tools)"
+            "Specialized Features and Server Utilities (8 tools)"
         ],
         "improvements": [
-            "32 specialized tools organized into 11 focused modules",
+            "38 specialized tools organized into focused modules",
             "68+ utility functions across 7 organized utility modules",
             "Enhanced parameter handling and validation",
             "Unified operation interfaces with comprehensive coverage",
@@ -403,14 +403,12 @@ def get_server_info() -> Dict:
     }
 
 # ---- Main Function ----
-def main(transport: str = "stdio", port: int = 8000):
+def main(transport: str = "stdio", host: str = "127.0.0.1", port: int = 8000):
     if transport == "http":
         import asyncio
-        # Set the port for HTTP transport
-        app.settings.port = port
-        # Start the FastMCP server with HTTP transport
+        # Start the MCP server with Streamable HTTP transport.
         try:
-            app.run(transport='streamable-http')
+            app.run(transport="streamable-http", host=host, port=port)
         except asyncio.exceptions.CancelledError:
             print("Server stopped by user.")
         except KeyboardInterrupt:
@@ -420,7 +418,7 @@ def main(transport: str = "stdio", port: int = 8000):
             
     elif transport == "sse":
         # Run the FastMCP server in SSE (Server Side Events) mode
-        app.run(transport='sse')
+        app.run(transport="sse", host=host, port=port)
         
     else:
         # Run the FastMCP server
@@ -440,6 +438,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--host",
+        type=str,
+        default=os.environ.get("MCP_HOST", "127.0.0.1"),
+        help="Host to bind HTTP/SSE transports to (default: MCP_HOST or 127.0.0.1)"
+    )
+
+    parser.add_argument(
         "-p",
         "--port",
         type=int,
@@ -447,4 +452,4 @@ if __name__ == "__main__":
         help="Port to run the MCP server on (default: 8000)"
     )
     args = parser.parse_args()
-    main(args.transport, args.port)
+    main(args.transport, args.host, args.port)

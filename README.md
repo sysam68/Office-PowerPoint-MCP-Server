@@ -2,7 +2,7 @@
 [![smithery badge](https://smithery.ai/badge/@GongRzhe/Office-PowerPoint-MCP-Server)](https://smithery.ai/server/@GongRzhe/Office-PowerPoint-MCP-Server)
 ![](https://badge.mcpx.dev?type=server 'MCP Server')
 
-A comprehensive MCP (Model Context Protocol) server for PowerPoint manipulation using python-pptx. **Version 2.0** provides 32 powerful tools organized into 11 specialized modules, offering complete PowerPoint creation, management, and professional design capabilities. The server features a modular architecture with enhanced parameter handling, intelligent operation selection, and comprehensive error handling.
+A comprehensive MCP (Model Context Protocol) server for PowerPoint manipulation using python-pptx. **Version 2.1** provides 38 powerful tools organized into specialized modules, offering complete PowerPoint creation, management, and professional design capabilities. The server features a modular architecture with enhanced parameter handling, intelligent operation selection, and comprehensive error handling.
 
 ----
 
@@ -80,7 +80,8 @@ npx -y @smithery/cli install @GongRzhe/Office-PowerPoint-MCP-Server --client cla
 
 ### Prerequisites
 
-- Python 3.6 or higher (as specified in pyproject.toml)
+- Python 3.10 or higher (as specified in pyproject.toml)
+- MCP Python SDK 2.3.0 (`FastMCP` was renamed to `MCPServer` in SDK 2.x)
 - pip package manager
 - Optional: uvx for package execution without local installation
 
@@ -146,7 +147,7 @@ python ppt_mcp_server.py
 Run the streamable-http server on port 8000:
 
 ```bash
-python ppt_mcp_server.py --transport http --port 8000
+python ppt_mcp_server.py --transport http --host 0.0.0.0 --port 8000
 ```
 
 Run in Docker
@@ -969,6 +970,12 @@ Office-PowerPoint-MCP-Server/
 ## 🔄 What's New in Version 2.1
 
 **Text extraction capabilities added!** Now you can read content from existing presentations:
+
+### **MCP SDK 2.x compatibility:**
+- Migrated from the removed `mcp.server.fastmcp.FastMCP` API to `mcp.server.mcpserver.MCPServer`
+- Pinned the MCP Python SDK to `2.3.0` for reproducible installations
+- Fixed Streamable HTTP host and port configuration for container deployments
+- Added MCP server compatibility and tool-catalog regression tests
 
 ### **New Text Extraction Tools Added:**
 - **`extract_slide_text`** - Extract all text content from a specific slide including titles, placeholders, text shapes, and tables
