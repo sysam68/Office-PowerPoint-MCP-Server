@@ -6,6 +6,8 @@ import sys         # For accessing Python interpreter related variables and func
 import platform    # For getting current operating system information
 import shutil      # For checking if executables exist in PATH
 
+MCP_SDK_VERSION = "2.3.0"
+
 def check_prerequisites():
     """
     Check if necessary prerequisites are installed
@@ -15,7 +17,7 @@ def check_prerequisites():
     """
     # Check Python version
     python_version = sys.version_info
-    python_ok = python_version.major >= 3 and python_version.minor >= 6
+    python_ok = python_version >= (3, 10)
     
     # Check if uv/uvx is installed
     uv_installed = shutil.which("uv") is not None
@@ -40,7 +42,7 @@ def setup_venv():
     Function to set up Python virtual environment
     
     Features:
-    - Checks if Python version meets requirements (3.6+)
+    - Checks if Python version meets requirements (3.10+)
     - Creates Python virtual environment (if it doesn't exist)
     - Installs required dependencies in the newly created virtual environment
     
@@ -50,8 +52,8 @@ def setup_venv():
     """
     # Check Python version
     python_version = sys.version_info
-    if python_version.major < 3 or (python_version.major == 3 and python_version.minor < 6):
-        print("Error: Python 3.6 or higher is required.")
+    if python_version < (3, 10):
+        print("Error: Python 3.10 or higher is required.")
         sys.exit(1)
     
     # Get absolute path of the directory containing the current script
@@ -104,7 +106,7 @@ def setup_venv():
     print("\nInstalling requirements...")
     try:
         # Install mcp package
-        subprocess.run([pip_path, 'install', 'mcp[cli]'], check=True)
+        subprocess.run([pip_path, 'install', f'mcp[cli]=={MCP_SDK_VERSION}'], check=True)
         # Install python-pptx package
         subprocess.run([pip_path, 'install', 'python-pptx'], check=True)
         
@@ -125,7 +127,7 @@ def setup_venv():
             print(f".venv\\Scripts\\activate")
         else:
             print("source .venv/bin/activate")
-        print("pip install mcp[cli] python-pptx")
+        print(f"pip install 'mcp[cli]=={MCP_SDK_VERSION}' python-pptx")
         sys.exit(1)
     
     return python_path
@@ -293,7 +295,7 @@ def create_package_structure():
     requirements_path = os.path.join(base_path, 'requirements.txt')
     if not os.path.exists(requirements_path):
         with open(requirements_path, 'w') as f:
-            f.write('mcp[cli]\npython-pptx\n')
+            f.write(f'mcp[cli]=={MCP_SDK_VERSION}\npython-pptx\n')
         print(f"Created requirements.txt at: {requirements_path}")
     
     # Create templates directory for PowerPoint templates
@@ -436,7 +438,7 @@ if __name__ == '__main__':
     python_ok, uv_installed, uvx_installed, ppt_server_installed = check_prerequisites()
     
     if not python_ok:
-        print("Error: Python 3.6 or higher is required.")
+        print("Error: Python 3.10 or higher is required.")
         sys.exit(1)
     
     print("PowerPoint MCP Server Setup")

@@ -4,14 +4,14 @@ Handles template application, template management, automated slide generation,
 and advanced features like dynamic sizing, auto-wrapping, and visual effects.
 """
 from typing import Dict, List, Optional, Any
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 import utils.template_utils as template_utils
 import os
 from pathlib import Path
 
 
-def register_template_tools(app: FastMCP, presentations: Dict, get_current_presentation_id):
+def register_template_tools(app: MCPServer, presentations: Dict, get_current_presentation_id):
     """Register template-based tools with the FastMCP app"""
 
     def _get_template_dir() -> Path:

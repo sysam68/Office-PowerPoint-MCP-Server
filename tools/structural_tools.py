@@ -3,12 +3,12 @@ Structural element tools for PowerPoint MCP Server.
 Handles tables, shapes, and charts.
 """
 from typing import Dict, List, Optional, Any
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 import utils as ppt_utils
 
 
-def register_structural_tools(app: FastMCP, presentations: Dict, get_current_presentation_id, validate_parameters, is_positive, is_non_negative, is_in_range, is_valid_rgb, add_shape_direct):
+def register_structural_tools(app: MCPServer, presentations: Dict, get_current_presentation_id, validate_parameters, is_positive, is_non_negative, is_in_range, is_valid_rgb, add_shape_direct):
     """Register structural element tools with the FastMCP app"""
     
     @app.tool(

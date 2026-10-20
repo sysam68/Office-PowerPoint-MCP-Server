@@ -3,7 +3,7 @@ Content management tools for PowerPoint MCP Server.
 Handles slides, text, images, and content manipulation.
 """
 from typing import Dict, List, Optional, Any, Union
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 import utils as ppt_utils
 import tempfile
@@ -11,7 +11,7 @@ import base64
 import os
 
 
-def register_content_tools(app: FastMCP, presentations: Dict, get_current_presentation_id, validate_parameters, is_positive, is_non_negative, is_in_range, is_valid_rgb):
+def register_content_tools(app: MCPServer, presentations: Dict, get_current_presentation_id, validate_parameters, is_positive, is_non_negative, is_in_range, is_valid_rgb):
     """Register content management tools with the FastMCP app"""
     
     @app.tool(

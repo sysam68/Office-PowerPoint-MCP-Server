@@ -3,12 +3,12 @@ Professional design tools for PowerPoint MCP Server.
 Handles themes, effects, fonts, and advanced formatting.
 """
 from typing import Dict, List, Optional, Any
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 import utils as ppt_utils
 
 
-def register_professional_tools(app: FastMCP, presentations: Dict, get_current_presentation_id):
+def register_professional_tools(app: MCPServer, presentations: Dict, get_current_presentation_id):
     """Register professional design tools with the FastMCP app"""
     
     @app.tool(
