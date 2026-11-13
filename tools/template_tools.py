@@ -58,6 +58,8 @@ def register_template_tools(app: MCPServer, presentations: Dict, get_current_pre
             iterator = template_dir.rglob("*") if recursive else template_dir.glob("*")
             files: List[Dict[str, Any]] = []
             for path in sorted((p for p in iterator if p.is_file()), key=lambda p: str(p).lower()):
+                if not path.resolve().is_relative_to(template_dir):
+                    continue
                 # POTX templates are not supported by python-pptx in this server.
                 if path.suffix.lower() == ".potx":
                     continue
