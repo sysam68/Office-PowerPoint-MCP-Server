@@ -89,7 +89,11 @@ class OIDCVerifier:
                 return None
             claims = jwt.decode(token, matching[0].key, algorithms=["RS256"], issuer=self.issuer,
                                 audience=AUDIENCE, options={"require": ["iss", "aud", "exp", "iat", "jti", "sub"]})
-            if claims.get("aud") != AUDIENCE or (claims.get("client_id") or claims.get("azp")) != CLIENT_ID:
+            raw_audience = claims.get("aud")
+            audiences = ([raw_audience] if isinstance(raw_audience, str)
+                         else raw_audience if isinstance(raw_audience, list)
+                         and all(isinstance(item, str) for item in raw_audience) else [])
+            if AUDIENCE not in audiences or (claims.get("client_id") or claims.get("azp")) != CLIENT_ID:
                 return None
             if "azp" in claims and claims["azp"] != CLIENT_ID:
                 return None

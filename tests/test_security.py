@@ -52,7 +52,9 @@ class SecurityTests(unittest.TestCase):
 
         with patch("ppt_security.httpx.AsyncClient", client):
             self.assertIsNotNone(asyncio.run(verify(base)))
-            for change in ({"aud": "wrong"}, {"client_id": "wrong"}, {"groups": []},
+            self.assertIsNotNone(asyncio.run(verify({**base, "aud": [AUDIENCE, "https://secondary.example.test/resource"]})))
+            for change in ({"aud": "wrong"}, {"aud": ["wrong", "also-wrong"]},
+                           {"aud": [AUDIENCE, 1]}, {"client_id": "wrong"}, {"groups": []},
                            {"sub": ""}, {"jti": ""}, {"scope": "openid"}, {"exp": now - 1},
                            {"iss": "https://other.example"}, {"azp": "wrong"}):
                 with self.subTest(change=change):
