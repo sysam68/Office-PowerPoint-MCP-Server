@@ -1,6 +1,7 @@
 """Security boundary for the PowerPoint MCP resource server."""
 import contextvars
 import hashlib
+import logging
 import os
 import time
 from collections.abc import MutableMapping
@@ -18,6 +19,7 @@ CLIENT_ID = "mcp-dcs-ppt"
 AUDIENCE = "https://mcp-servers.shared.mpn/powerpoint/api/mcp"
 READ = "powerpoint:read"
 WRITE = "powerpoint:write"
+LOGGER = logging.getLogger(__name__)
 READ_TOOLS = frozenset({"open_presentation", "get_presentation_info", "get_model_file_info",
                         "get_slide_info", "extract_slide_text", "extract_presentation_text",
                         "list_file_models", "list_slide_templates", "get_layout_template_info",
@@ -70,6 +72,10 @@ class OIDCVerifier:
         self.issuer = issuer
 
     async def verify_token(self, token):
+        def rejected(reason):
+            LOGGER.warning("OIDC access token rejected: %s", reason)
+            return None
+
         try:
             async with httpx.AsyncClient(timeout=5, follow_redirects=False) as client:
                 response = await client.get(self.issuer.rstrip("/") + "/.well-known/openid-configuration")
@@ -77,16 +83,16 @@ class OIDCVerifier:
                 discovery = response.json()
                 jwks_url = discovery["jwks_uri"]
                 if discovery["issuer"] != self.issuer or urlsplit(jwks_url).scheme != "https":
-                    return None
+                    return rejected("invalid_discovery_metadata")
                 response = await client.get(jwks_url)
                 response.raise_for_status()
                 keys = jwt.PyJWKSet.from_dict(response.json()).keys
             header = jwt.get_unverified_header(token)
             if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
-                return None
+                return rejected("invalid_token_header")
             matching = [k for k in keys if k.key_id == header["kid"] and k.algorithm_name == "RS256"]
             if len(matching) != 1:
-                return None
+                return rejected("signing_key_not_found")
             claims = jwt.decode(token, matching[0].key, algorithms=["RS256"], issuer=self.issuer,
                                 audience=AUDIENCE, options={"require": ["iss", "aud", "exp", "iat", "jti", "sub"]})
             raw_audience = claims.get("aud")
@@ -94,23 +100,33 @@ class OIDCVerifier:
                          else raw_audience if isinstance(raw_audience, list)
                          and all(isinstance(item, str) for item in raw_audience) else [])
             if AUDIENCE not in audiences or (claims.get("client_id") or claims.get("azp")) != CLIENT_ID:
-                return None
+                return rejected("audience_or_client_mismatch")
             if "azp" in claims and claims["azp"] != CLIENT_ID:
-                return None
+                return rejected("authorized_party_mismatch")
             if not all(isinstance(claims.get(k), str) and claims[k].strip() for k in ("sub", "jti")):
-                return None
+                return rejected("subject_or_token_id_missing")
             if not isinstance(claims.get("groups"), list) or "users" not in claims["groups"]:
-                return None
+                return rejected("required_group_missing")
             scope = claims.get("scope")
             if not isinstance(scope, str):
-                return None
+                return rejected("invalid_scope_claim")
             scopes = scope.split()
             if not set(scopes).intersection({READ, WRITE}):
-                return None
+                return rejected("required_scope_missing")
             return AccessToken(token=token, client_id=CLIENT_ID, subject=claims["sub"],
                                scopes=scopes, expires_at=claims["exp"], claims={"iss": self.issuer})
-        except (httpx.HTTPError, ValueError, KeyError, TypeError, jwt.PyJWTError):
-            return None
+        except jwt.InvalidAudienceError:
+            return rejected("invalid_audience")
+        except jwt.InvalidIssuerError:
+            return rejected("invalid_issuer")
+        except jwt.MissingRequiredClaimError:
+            return rejected("required_claim_missing")
+        except jwt.PyJWTError:
+            return rejected("invalid_jwt")
+        except httpx.HTTPError:
+            return rejected("oidc_dependency_unavailable")
+        except (ValueError, KeyError, TypeError):
+            return rejected("invalid_oidc_response")
 
 
 def _bounded_path(value, root):
