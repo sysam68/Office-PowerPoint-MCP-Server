@@ -7,6 +7,8 @@ import os
 import argparse
 from typing import Dict, Any
 from mcp.server.mcpserver import MCPServer
+from ppt_security import (AUDIENCE, READ, WRITE, OIDCVerifier, SecurityMiddleware, SessionPresentations,
+                          current_id, set_current_id)
 
 # import utils  # Currently unused
 from tools import (
@@ -24,12 +26,11 @@ from tools import (
 
 # Initialize the MCP server
 app = MCPServer(
-    name="ppt-mcp-server"
+    name="ppt-mcp-server", middleware=[SecurityMiddleware()]
 )
 
 # Global state to store presentations in memory
-presentations = {}
-current_presentation_id = None
+presentations = SessionPresentations()
 
 # Template configuration
 def get_template_search_directories():
@@ -48,7 +49,7 @@ def get_template_search_directories():
         import platform
         separator = ';' if platform.system() == "Windows" else ':'
         env_dirs = [path.strip() for path in template_env_path.split(separator) if path.strip()]
-        
+
         # Verify that the directories exist
         valid_env_dirs = []
         for dir_path in env_dirs:
@@ -57,30 +58,28 @@ def get_template_search_directories():
                 valid_env_dirs.append(expanded_path)
         
         if valid_env_dirs:
-            # Add default fallback directories
-            return valid_env_dirs + ['.', './templates', './assets', './resources']
+            return valid_env_dirs
         else:
             print(f"Warning: PPT_TEMPLATE_PATH directories not found: {template_env_path}")
     
     # Default search directories when no environment variable or invalid paths
-    return ['.', './templates', './assets', './resources']
+    return []
 
 # ---- Helper Functions ----
 
 def get_current_presentation():
     """Get the current presentation object or raise an error if none is loaded."""
-    if current_presentation_id is None or current_presentation_id not in presentations:
+    if current_id() is None or current_id() not in presentations:
         raise ValueError("No presentation is currently loaded. Please create or open a presentation first.")
-    return presentations[current_presentation_id]
+    return presentations[current_id()]
 
 def get_current_presentation_id():
     """Get the current presentation ID."""
-    return current_presentation_id
+    return current_id()
 
 def set_current_presentation_id(pres_id):
     """Set the current presentation ID."""
-    global current_presentation_id
-    current_presentation_id = pres_id
+    set_current_id(pres_id)
 
 def validate_parameters(params):
     """
@@ -335,11 +334,11 @@ def list_presentations() -> Dict:
             {
                 "id": pres_id,
                 "slide_count": len(pres.slides),
-                "is_current": pres_id == current_presentation_id
+                "is_current": pres_id == current_id()
             }
             for pres_id, pres in presentations.items()
         ],
-        "current_presentation_id": current_presentation_id,
+        "current_presentation_id": current_id(),
         "total_presentations": len(presentations)
     }
 
@@ -351,14 +350,13 @@ def switch_presentation(presentation_id: str) -> Dict:
             "error": f"Presentation '{presentation_id}' not found. Available presentations: {list(presentations.keys())}"
         }
     
-    global current_presentation_id
-    old_id = current_presentation_id
-    current_presentation_id = presentation_id
+    old_id = current_id()
+    set_current_id(presentation_id)
     
     return {
         "message": f"Switched from presentation '{old_id}' to '{presentation_id}'",
         "previous_presentation_id": old_id,
-        "current_presentation_id": current_presentation_id
+        "current_presentation_id": current_id()
     }
 
 @app.tool()
@@ -369,7 +367,7 @@ def get_server_info() -> Dict:
         "version": "2.1.0",
         "total_tools": 38,
         "loaded_presentations": len(presentations),
-        "current_presentation": current_presentation_id,
+        "current_presentation": current_id(),
         "features": [
             "Presentation Management (7 tools)",
             "Content Management (8 tools)",
@@ -402,20 +400,57 @@ def get_server_info() -> Dict:
         ]
     }
 
+def configure_auth(transport: str, host: str):
+    mode = os.environ.get("PPT_AUTH_MODE", "oidc")
+    if mode == "local":
+        if transport != "stdio" and (transport != "http" or host not in {"127.0.0.1", "::1"}):
+            raise ValueError("Local authentication bypass requires a loopback bind")
+    elif mode == "oidc":
+        if transport != "http":
+            raise ValueError("OIDC mode requires Streamable HTTP")
+        from urllib.parse import urlsplit
+        from mcp.server.auth.settings import AuthSettings
+        issuer = os.environ.get("PPT_OIDC_ISSUER", "")
+        audience = os.environ.get("PPT_OIDC_AUDIENCE", "")
+        resource = os.environ.get("PPT_RESOURCE_URL", "")
+        parsed = urlsplit(issuer)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment or audience != AUDIENCE or resource != AUDIENCE:
+            raise ValueError("Invalid or missing OIDC configuration")
+        app.settings.auth = AuthSettings(issuer_url=issuer, resource_server_url=resource,
+                                         validate_token_resource=False)
+        app._token_verifier = OIDCVerifier(issuer)
+    else:
+        raise ValueError("Unknown authentication mode")
+
+
+def build_http_app(host="127.0.0.1", json_response=False):
+    from mcp.server.auth.routes import create_protected_resource_routes
+    web = app.streamable_http_app(host=host, json_response=json_response)
+    if app.settings.auth:
+        auth = app.settings.auth
+        metadata_routes = create_protected_resource_routes(
+            resource_url=auth.resource_server_url, authorization_servers=[auth.issuer_url],
+            scopes_supported=[READ, WRITE])
+        metadata_path = metadata_routes[0].path
+        web.router.routes = [r for r in web.router.routes if getattr(r, "path", None) != metadata_path]
+        web.router.routes.extend(metadata_routes)
+    return web
+
+
 # ---- Main Function ----
 def main(transport: str = "stdio", host: str = "127.0.0.1", port: int = 8000):
+    configure_auth(transport, host)
     if transport == "http":
         import asyncio
         # Start the MCP server with Streamable HTTP transport.
         try:
-            app.run(transport="streamable-http", host=host, port=port)
+            import uvicorn
+            uvicorn.run(build_http_app(host), host=host, port=port, access_log=False)
         except asyncio.exceptions.CancelledError:
             print("Server stopped by user.")
         except KeyboardInterrupt:
             print("Server stopped by user.")
-        except Exception as e:
-            print(f"Error starting server: {e}")
-            
+
     elif transport == "sse":
         # Run the FastMCP server in SSE (Server Side Events) mode
         app.run(transport="sse", host=host, port=port)

@@ -22,6 +22,8 @@ dependencies = [
     "mcp[cli]==2.3.0",
     "Pillow>=8.0.0",
     "fonttools>=4.0.0",
+    "PyJWT[crypto]>=2.10,<3",
+    "httpx>=0.27,<1",
 ]
 
 [project.urls]
@@ -29,7 +31,7 @@ dependencies = [
 "Bug Tracker" = "https://github.com/GongRzhe/Office-PowerPoint-MCP-Server.git/issues"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["ppt_mcp_server.py", "tools/", "utils/", "enhanced_slide_templates.json", "slide_layout_templates.json"]
+only-include = ["ppt_mcp_server.py", "ppt_security.py", "tools/", "utils/", "enhanced_slide_templates.json", "slide_layout_templates.json"]
 sources = ["."]
 
 [tool.hatch.build]
