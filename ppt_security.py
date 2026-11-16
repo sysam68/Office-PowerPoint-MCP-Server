@@ -16,7 +16,7 @@ from mcp.server.auth.provider import AccessToken
 from mcp.shared.exceptions import MCPError
 
 CLIENT_ID = "mcp-dcs-ppt"
-AUDIENCE = "https://mcp-servers.shared.mpn/powerpoint/api/mcp"
+AUDIENCE = "https://mcp-servers.fmpn.fr/powerpoint/api/mcp"
 READ = "powerpoint:read"
 WRITE = "powerpoint:write"
 LOGGER = logging.getLogger(__name__)
