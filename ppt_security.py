@@ -105,8 +105,6 @@ class OIDCVerifier:
                 return rejected("authorized_party_mismatch")
             if not all(isinstance(claims.get(k), str) and claims[k].strip() for k in ("sub", "jti")):
                 return rejected("subject_or_token_id_missing")
-            if not isinstance(claims.get("groups"), list) or "users" not in claims["groups"]:
-                return rejected("required_group_missing")
             scope = claims.get("scope")
             if not isinstance(scope, str):
                 return rejected("invalid_scope_claim")
