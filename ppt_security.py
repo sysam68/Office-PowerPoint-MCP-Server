@@ -42,6 +42,32 @@ _LAST_USED = {}
 _SESSION_IDLE_SECONDS = 3600
 
 
+def _normalize_scope_claims(claims):
+    """Return normalized OAuth scopes or None for malformed/conflicting claims."""
+    normalized = {}
+    for claim_name in ("scope", "scp"):
+        if claim_name not in claims:
+            continue
+        value = claims[claim_name]
+        if isinstance(value, str):
+            scopes = value.split()
+        elif isinstance(value, list) and all(
+            isinstance(item, str) and item and not any(char.isspace() for char in item)
+            for item in value
+        ):
+            scopes = value
+        else:
+            return None
+        if not scopes:
+            return None
+        normalized[claim_name] = scopes
+    if not normalized:
+        return None
+    if len(normalized) == 2 and set(normalized["scope"]) != set(normalized["scp"]):
+        return None
+    return list(normalized["scope"] if "scope" in normalized else normalized["scp"])
+
+
 class SessionPresentations(MutableMapping):
     def _data(self):
         key = _session.get()
@@ -108,10 +134,9 @@ class OIDCVerifier:
                 return rejected("authorized_party_mismatch")
             if not all(isinstance(claims.get(k), str) and claims[k].strip() for k in ("sub", "jti")):
                 return rejected("subject_or_token_id_missing")
-            scope = claims.get("scope")
-            if not isinstance(scope, str):
+            scopes = _normalize_scope_claims(claims)
+            if scopes is None:
                 return rejected("invalid_scope_claim")
-            scopes = scope.split()
             if not set(scopes).intersection({READ, WRITE}):
                 return rejected("required_scope_missing")
             return AccessToken(token=token, client_id=CLIENT_ID, subject=claims["sub"],

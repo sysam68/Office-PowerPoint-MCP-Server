@@ -59,12 +59,26 @@ class SecurityTests(unittest.TestCase):
             self.assertIsNotNone(asyncio.run(verify({**base, "aud": INTERNAL_AUDIENCE})))
             self.assertIsNotNone(asyncio.run(verify({key: value for key, value in base.items() if key != "groups"})))
             self.assertIsNotNone(asyncio.run(verify({**base, "groups": ["guests"]})))
+            self.assertIsNotNone(asyncio.run(verify({**base, "scope": [READ, WRITE]})))
+            without_scope = {key: value for key, value in base.items() if key != "scope"}
+            self.assertIsNotNone(asyncio.run(verify({**without_scope, "scp": READ})))
+            self.assertIsNotNone(asyncio.run(verify({**without_scope, "scp": [READ, WRITE]})))
+            self.assertIsNotNone(asyncio.run(verify({**base, "scp": [READ]})))
             for change in ({"aud": "wrong"}, {"aud": ["wrong", "also-wrong"]},
                            {"aud": [AUDIENCE, 1]}, {"client_id": "wrong"},
                            {"sub": ""}, {"jti": ""}, {"scope": "openid"}, {"exp": now - 1},
                            {"iss": "https://other.example"}, {"azp": "wrong"}):
                 with self.subTest(change=change):
                     self.assertIsNone(asyncio.run(verify({**base, **change})))
+            for invalid_claims in (
+                without_scope,
+                {**without_scope, "scope": [READ, 1]},
+                {**without_scope, "scp": [READ, 1]},
+                {**without_scope, "scp": []},
+                {**base, "scp": [WRITE]},
+            ):
+                with self.subTest(invalid_claims=invalid_claims):
+                    self.assertIsNone(asyncio.run(verify(invalid_claims)))
             other_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
             self.assertIsNone(asyncio.run(verify(base, other_key)))
 
