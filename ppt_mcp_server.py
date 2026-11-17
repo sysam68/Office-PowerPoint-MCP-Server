@@ -7,7 +7,7 @@ import os
 import argparse
 from typing import Dict, Any
 from mcp.server.mcpserver import MCPServer
-from ppt_security import (AUDIENCE, READ, WRITE, OIDCVerifier, SecurityMiddleware, SessionPresentations,
+from ppt_security import (AUDIENCES, READ, WRITE, OIDCVerifier, SecurityMiddleware, SessionPresentations,
                           current_id, set_current_id)
 
 # import utils  # Currently unused
@@ -411,10 +411,10 @@ def configure_auth(transport: str, host: str):
         from urllib.parse import urlsplit
         from mcp.server.auth.settings import AuthSettings
         issuer = os.environ.get("PPT_OIDC_ISSUER", "")
-        audience = os.environ.get("PPT_OIDC_AUDIENCE", "")
+        audiences = tuple(value.strip() for value in os.environ.get("PPT_OIDC_AUDIENCES", "").split(",") if value.strip())
         resource = os.environ.get("PPT_RESOURCE_URL", "")
         parsed = urlsplit(issuer)
-        if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment or audience != AUDIENCE or resource != AUDIENCE:
+        if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment or set(audiences) != set(AUDIENCES) or resource not in AUDIENCES:
             raise ValueError("Invalid or missing OIDC configuration")
         app.settings.auth = AuthSettings(issuer_url=issuer, resource_server_url=resource,
                                          validate_token_resource=False)

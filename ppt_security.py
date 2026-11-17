@@ -16,7 +16,10 @@ from mcp.server.auth.provider import AccessToken
 from mcp.shared.exceptions import MCPError
 
 CLIENT_ID = "mcp-dcs-ppt"
-AUDIENCE = "https://mcp-servers.fmpn.fr/powerpoint/api/mcp"
+AUDIENCES = (
+    "https://mcp-servers.fmpn.fr/powerpoint/api/mcp",
+    "https://mcp-servers.shared.mpn/powerpoint/api/mcp",
+)
 READ = "powerpoint:read"
 WRITE = "powerpoint:write"
 LOGGER = logging.getLogger(__name__)
@@ -94,12 +97,12 @@ class OIDCVerifier:
             if len(matching) != 1:
                 return rejected("signing_key_not_found")
             claims = jwt.decode(token, matching[0].key, algorithms=["RS256"], issuer=self.issuer,
-                                audience=AUDIENCE, options={"require": ["iss", "aud", "exp", "iat", "jti", "sub"]})
+                                audience=list(AUDIENCES), options={"require": ["iss", "aud", "exp", "iat", "jti", "sub"]})
             raw_audience = claims.get("aud")
             audiences = ([raw_audience] if isinstance(raw_audience, str)
                          else raw_audience if isinstance(raw_audience, list)
                          and all(isinstance(item, str) for item in raw_audience) else [])
-            if AUDIENCE not in audiences or (claims.get("client_id") or claims.get("azp")) != CLIENT_ID:
+            if not set(audiences).intersection(AUDIENCES) or (claims.get("client_id") or claims.get("azp")) != CLIENT_ID:
                 return rejected("audience_or_client_mismatch")
             if "azp" in claims and claims["azp"] != CLIENT_ID:
                 return rejected("authorized_party_mismatch")
