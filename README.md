@@ -995,10 +995,10 @@ MIT
 ## Security and deployment profile
 
 Streamable HTTP runs as an OAuth resource server by default. Set `PPT_AUTH_MODE=oidc`,
-`PPT_OIDC_ISSUER` to the HTTPS Authelia issuer and both `PPT_OIDC_AUDIENCE` and
+`PPT_OIDC_ISSUER` to the HTTPS Authelia issuer, `PPT_OIDC_AUDIENCES` to the comma-separated public/internal resource URLs, and
 `PPT_RESOURCE_URL` to `https://mcp-servers.fmpn.fr/powerpoint/api/mcp`.
 The accepted interactive client is `mcp-dcs-ppt` using the standard claims policy.
-JWTs must have a valid RS256 signature, the exact issuer and audience, a matching
+JWTs must have a valid RS256 signature, the exact issuer and one of the two exact audiences, a matching
 `client_id` or `azp`, `sub`, `jti`, `iat`, `exp`, and a PowerPoint scope. Any
 authenticated user is accepted regardless of group membership. Read tools require
 `powerpoint:read`; changes and exports require

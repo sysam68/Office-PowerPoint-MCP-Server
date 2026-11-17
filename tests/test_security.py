@@ -12,7 +12,10 @@ from mcp.server.auth.provider import AccessToken
 from starlette.testclient import TestClient
 
 import ppt_mcp_server as server
-from ppt_security import AUDIENCE, CLIENT_ID, READ, WRITE, READ_TOOLS, WRITE_TOOLS, OIDCVerifier, _paths
+from ppt_security import AUDIENCES, CLIENT_ID, READ, WRITE, READ_TOOLS, WRITE_TOOLS, OIDCVerifier, _paths
+
+AUDIENCE = AUDIENCES[0]
+INTERNAL_AUDIENCE = AUDIENCES[1]
 
 
 class StubVerifier:
@@ -53,6 +56,7 @@ class SecurityTests(unittest.TestCase):
         with patch("ppt_security.httpx.AsyncClient", client):
             self.assertIsNotNone(asyncio.run(verify(base)))
             self.assertIsNotNone(asyncio.run(verify({**base, "aud": [AUDIENCE, "https://secondary.example.test/resource"]})))
+            self.assertIsNotNone(asyncio.run(verify({**base, "aud": INTERNAL_AUDIENCE})))
             self.assertIsNotNone(asyncio.run(verify({key: value for key, value in base.items() if key != "groups"})))
             self.assertIsNotNone(asyncio.run(verify({**base, "groups": ["guests"]})))
             for change in ({"aud": "wrong"}, {"aud": ["wrong", "also-wrong"]},
@@ -90,7 +94,7 @@ class SecurityTests(unittest.TestCase):
     def test_http_session_isolation_and_scopes(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
             "PPT_AUTH_MODE": "oidc", "PPT_OIDC_ISSUER": "https://issuer.example",
-            "PPT_OIDC_AUDIENCE": AUDIENCE, "PPT_RESOURCE_URL": AUDIENCE,
+            "PPT_OIDC_AUDIENCES": ",".join(AUDIENCES), "PPT_RESOURCE_URL": AUDIENCE,
             "PPT_WORKSPACE_ROOT": directory, "PPT_TEMPLATE_PATH": directory,
         }, clear=True):
             server.configure_auth("http", "127.0.0.1")
